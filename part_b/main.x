@@ -3,10 +3,16 @@ struct arguments{
 	int a;
 	int b;
 };
+struct resultStruct{
+    int result;
+	bool error;
+	string errorString<>;
+};
 
 
-program ADD_PROG{
+
+program Executer{
 	version ADD_VERS{
-		int execute(arguments)=1;
+		resultStruct execute(arguments)=1;
 	}=1;
 }=0x01010101;

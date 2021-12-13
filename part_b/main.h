@@ -21,29 +21,38 @@ struct arguments {
 };
 typedef struct arguments arguments;
 
-#define ADD_PROG 0x01010101
+struct resultStruct {
+	int result;
+	bool_t error;
+	char *errorString;
+};
+typedef struct resultStruct resultStruct;
+
+#define Executer 0x01010101
 #define ADD_VERS 1
 
 #if defined(__STDC__) || defined(__cplusplus)
 #define execute 1
-extern  int * execute_1(arguments *, CLIENT *);
-extern  int * execute_1_svc(arguments *, struct svc_req *);
-extern int add_prog_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
+extern  resultStruct * execute_1(arguments *, CLIENT *);
+extern  resultStruct * execute_1_svc(arguments *, struct svc_req *);
+extern int executer_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
 
 #else /* K&R C */
 #define execute 1
-extern  int * execute_1();
-extern  int * execute_1_svc();
-extern int add_prog_1_freeresult ();
+extern  resultStruct * execute_1();
+extern  resultStruct * execute_1_svc();
+extern int executer_1_freeresult ();
 #endif /* K&R C */
 
 /* the xdr functions */
 
 #if defined(__STDC__) || defined(__cplusplus)
 extern  bool_t xdr_arguments (XDR *, arguments*);
+extern  bool_t xdr_resultStruct (XDR *, resultStruct*);
 
 #else /* K&R C */
 extern bool_t xdr_arguments ();
+extern bool_t xdr_resultStruct ();
 
 #endif /* K&R C */
 
