@@ -14,16 +14,23 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
-#define READ_END 0			  // We will use 0 for read end
-#define WRITE_END 1			  // and 1 for write end
+#define READ_END 0		// We will use 0 for read end
+#define WRITE_END 1		// and 1 for write end
+char message[100] = ""; // Message that will be sent to logger service
+
+// Signature of the log_event function. Check below for further explaination
+void log_event(char *host, int port);
 
 resultStruct *
-execute_1_svc(arguments *argp, struct svc_req *rqstp)
+execute_1_svc(arguments *argp, struct svc_req *rqstp, int port, char *host)
 {
-	static resultStruct result;
+	static resultStruct result; // Response of the blackbox and errors (if any) will be stored her
 
-	// Pipes to communicate between parent child
+	// Pipes to communicate between parent and child
 	int p_c[2], c_p_out[2], c_p_error[2];
 	pid_t pid; // Process id of the child
 	char errorBuffer[10000] = "";
@@ -47,28 +54,37 @@ execute_1_svc(arguments *argp, struct svc_req *rqstp)
 		close(c_p_error[WRITE_END]); // Parent will not use the write end of c_p pipe since it will not send a message to itself.
 		close(c_p_out[WRITE_END]);	 // Parent will not use the write end of c_p pipe since it will not send a message to itself.
 
-		char message[10000] = "";
+		// Merge integers into one string
 		sprintf(message, "%d %d", argp->a, argp->b);
-		// strcat(number_1, "\n");
 
+		// Send integers to blackbox by using pipe p_c
 		write(p_c[WRITE_END], message, (strlen(message) + 1));
 		close(p_c[WRITE_END]);
 
-		int errBytes = read(c_p_error[READ_END], errorBuffer, sizeof(errorBuffer));
-		int outBytes = read(c_p_out[READ_END], outBuffer, sizeof(outBuffer));
+		int errBytes = read(c_p_error[READ_END], errorBuffer, sizeof(errorBuffer)); // Read Error Pipe
+		int outBytes = read(c_p_out[READ_END], outBuffer, sizeof(outBuffer));		// Read Output Pipe
+		// Closes pipes since we are not expecting any more message from child
 		close(c_p_error[READ_END]);
 		close(c_p_out[READ_END]);
+
+		// If something is in the error pipe, errBytes will be > 0
 		if (errBytes > 0)
 		{
 			// result.error boolean is set to 1 to warn client
 			result.error = 1;
 			result.errorString = errorBuffer; // Save the error message
+
+			sprintf(message, "%s _\n", message); // Add _ to log
+			log_event(host, port);				 // Send the log the log server
 		}
 		else
 		{
-			result.error = 0; // Child did not return any errors
-			result.errorString = ""; // Empty error string
+			result.error = 0;				 // Child did not return any errors
+			result.errorString = "";		 // Empty error string
 			result.result = atoi(outBuffer); // Convert char* to integer and save to result struct
+
+			sprintf(message, "%s %d\n", message, result.result); // Add the output to log
+			log_event(host, port);								 // Send the log the log server
 		}
 	}
 	else
@@ -92,4 +108,47 @@ execute_1_svc(arguments *argp, struct svc_req *rqstp)
 	}
 
 	return &result;
+}
+/**
+ * 
+// This code is mainly taken from http://www.qnx.com/developers/docs/qnx_4.25_docs/tcpip50/prog_guide/sock_ipc_tut.html
+ * @brief Send `message` variable's content to log server
+ * 
+ * @param host IP address of the log server
+ * @param port Port of the log server
+ */
+void log_event(char *host, int port)
+{
+
+	int sock;
+	struct sockaddr_in server;
+	struct hostent *hp, *gethostbyname();
+
+	//Create socket
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0)
+	{
+		perror("opening stream socket");
+		exit(1);
+	}
+	// Connect created socket to specified host
+	server.sin_family = AF_INET;
+	hp = gethostbyname(host);
+	if (hp == 0)
+	{
+		// Could not find corresponding host
+		fprintf(stderr, "%s: unknown host\n", host);
+		exit(2);
+	}
+	memcpy(&server.sin_addr, hp->h_addr, hp->h_length); // Copy host to server struct
+	server.sin_port = htons(port);						// Specify which port to use
+	if (connect(sock, (struct sockaddr *)&server,
+				sizeof(server)) < 0)
+	{
+		perror("connecting stream socket");
+		exit(1);
+	}
+	if (write(sock, message, sizeof(message)) < 0) // Send the log to server
+		perror("writing on stream socket");
+	close(sock);
 }

@@ -34,7 +34,7 @@ typedef struct resultStruct resultStruct;
 #if defined(__STDC__) || defined(__cplusplus)
 #define execute 1
 extern  resultStruct * execute_1(arguments *, CLIENT *);
-extern  resultStruct * execute_1_svc(arguments *, struct svc_req *);
+extern  resultStruct * execute_1_svc(arguments *, struct svc_req *,int,char*);
 extern int executer_1_freeresult (SVCXPRT *, xdrproc_t, caddr_t);
 
 #else /* K&R C */
